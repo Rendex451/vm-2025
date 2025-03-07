@@ -5,26 +5,29 @@ import math
 
 G = 6.67430e-11  
 M_p = 5.972e24
-M_s = 1000  
+M_s = 1.989e30
 r_p = 6.371e6
-orbit_radius = 1.5e9
+r_star = 6.963e8
+orbit_radius = 1.5e12
 angle = 180
 
 
 x_p, y_p = 0, 0
 
-
-v_px, v_py = 0, 0.5e3
-v_p = 2.9e4
 x_star, y_star = x_p + orbit_radius, 0 
 
-x_s, y_s = 3 * r_p, -4 * r_p  # Initial position of the spacecraft
-v_x, v_y = -7e3, 3e3
+v_p = 0.5e3
+
+
+x_s, y_s = 3 * r_p, -4 * r_p  # Начальная позиция космического аппарата
+v_x, v_y = -7e3, 3e3  # Начальная скорость космического аппарата
 dt = 60
 day = 1440
-num_steps = day//10 # 1 сутки
+num_steps = day*10 # 1 сутки
 T = 360 * 24 * 3600  # Полный оборот за 360 дней в секундах
 omega = 2 * np.pi / T  # Угловая скорость (рад/сек)
+
+
 
 def PlanetMoving(t):
     
@@ -35,21 +38,37 @@ def PlanetMoving(t):
 
 initial_distance = np.sqrt((x_s - x_p)**2 + (y_s - y_p)**2)
 
+def acceleration(x_s, y_s, x_p, y_p):
+    r = np.sqrt((x_s - x_p)**2 + (y_s - y_p)**2)
+    if r <= r_p:
+        print("Crash! The spacecraft has collided with the planet.")
+        return None, None  # Остановка при столкновении
+    
+    a_x = -G * M_p * (x_s - x_p) / r**3
+    a_y = -G * M_p * (y_s - y_p) / r**3
+    return a_x, a_y, r
+
+def star_acceleration(x_s, y_s):
+    r = np.sqrt((x_s-x_star)**2 + (y_s - y_star)**2)
+    if r <= r_star:
+        print("Crash! The spacecraft has collided with the star.")
+        return None, None
+    a_x = -G * M_s * (x_s - x_star) / r**3
+    a_y = -G * M_s * (y_s - y_star) / r**3
+    return a_x, a_y
 
 def EulerMethod(x_s, y_s, x_p, y_p, v_x, v_y):
     x_trajectory, y_trajectory = [], []
     x_planet_trajectory, y_planet_trajectory = [], []
     speed, distance = [], []
     t=0
-    for _ in range(num_steps):
-        r = np.sqrt((x_s - x_p)**2 + (y_s - y_p)**2)
-        if r <= r_p:
-            print("Crash! The spacecraft has collided with the planet.")
+    for i in range(num_steps):
+        a_x_p, a_y_p, r_p = acceleration(x_s, y_s, x_p, y_p)
+        a_x_s, a_y_s = star_acceleration(x_s, y_s)
+        if a_x_s is None or a_x_p is None:
             break
-
-        
-        a_x = -G * M_p * (x_s - x_p) / r**3
-        a_y = -G * M_p * (y_s - y_p) / r**3
+        a_x = a_x_s + a_x_p
+        a_y = a_y_s + a_y_p
 
         
         v_x += a_x * dt
@@ -70,7 +89,7 @@ def EulerMethod(x_s, y_s, x_p, y_p, v_x, v_y):
 
         
         speed.append(np.sqrt(v_x**2 + v_y**2))
-        distance.append(r)
+        distance.append(r_p)
         t+=dt
     return x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance     
 
@@ -79,21 +98,10 @@ def RK4Method(x_s, y_s, x_p, y_p, v_x, v_y):
     x_planet_trajectory, y_planet_trajectory = [], []
     speed, distance = [], []
     t = 0
-    ang = angle
-
-    def acceleration(x_s, y_s, x_p, y_p):
-        r = np.sqrt((x_s - x_p)**2 + (y_s - y_p)**2)
-        if r <= r_p:
-            print("Crash! The spacecraft has collided with the planet.")
-            return None, None  # Остановка при столкновении
-        
-        a_x = -G * M_p * (x_s - x_p) / r**3
-        a_y = -G * M_p * (y_s - y_p) / r**3
-        return a_x, a_y
-
-    for _ in range(num_steps):
+    
+    for i in range(num_steps):
         # Вычисляем ускорение в начальной точке
-        a_x1, a_y1 = acceleration(x_s, y_s, x_p, y_p)
+        a_x1, a_y1, _ = acceleration(x_s, y_s, x_p, y_p)
         if a_x1 is None: break  # Остановка при столкновении
 
         # K1
@@ -101,20 +109,20 @@ def RK4Method(x_s, y_s, x_p, y_p, v_x, v_y):
         k1_x, k1_y = v_x * dt, v_y * dt
 
         # K2 (используем половину шага)
-        a_x2, a_y2 = acceleration(x_s + 0.5 * k1_x, y_s + 0.5 * k1_y, x_p, y_p)
+        a_x2, a_y2, _ = acceleration(x_s + 0.5 * k1_x, y_s + 0.5 * k1_y, x_p, y_p)
         if a_x2 is None: break  # Остановка при столкновении
         k2_vx, k2_vy = a_x2 * dt, a_y2 * dt
         k2_x, k2_y = (v_x + 0.5 * k1_vx) * dt, (v_y + 0.5 * k1_vy) * dt
 
         # K3 (ещё одна половина шага)
-        a_x3, a_y3 = acceleration(x_s + 0.5 * k2_x, y_s + 0.5 * k2_y, x_p, y_p)
+        a_x3, a_y3, _ = acceleration(x_s + 0.5 * k2_x, y_s + 0.5 * k2_y, x_p, y_p)
         if a_x3 is None: break  # Остановка при столкновении
         k3_vx, k3_vy = a_x3 * dt, a_y3 * dt
         k3_x, k3_y = (v_x + 0.5 * k2_vx) * dt, (v_y + 0.5 * k2_vy) * dt
 
         # K4 (полный шаг)
         
-        a_x4, a_y4 = acceleration(x_s + k3_x, y_s + k3_y, x_p, y_p)
+        a_x4, a_y4, _ = acceleration(x_s + k3_x, y_s + k3_y, x_p, y_p)
         if a_x4 is None: break  # Остановка при столкновении
         k4_vx, k4_vy = a_x4 * dt, a_y4 * dt
         k4_x, k4_y = (v_x + k3_vx) * dt, (v_y + k3_vy) * dt
