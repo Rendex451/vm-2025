@@ -1,23 +1,39 @@
 from numpy import pi, sqrt
 
 G = 6.67430e-11                             # Гравитационная постоянная
-M_planet = 5.972e27                         # Масса планеты (кг)
-M_star = 1.989e30                           # Масса Солнца (кг)
-r_planet = 6.371e6                          # Радиус планеты (м)
-r_star = 6.963e8                            # Радиус Солнца (м)
-orbit_radius = 1.5e12                       # Радиус орбиты (м)
+M_PLANET = 5.972e27                         # Масса планеты (кг)
+M_STAR = 1.989e30                           # Масса Солнца (кг)
+R_PLANET = 6.371e6                          # Радиус планеты (м)
+R_STAR = 6.963e8                            # Радиус Солнца (м)
+ORBIT_RADIUS = 1.5e11                       # Радиус орбиты (м)
 
-x_planet, y_planet = 0, 0                   # Начальная позиция планеты
-x_star, y_star = x_planet + orbit_radius, 0 # Начальная позиция Cолнца
-v_p = 0.5e3                                 # Начальная скорость планеты (м/с)
+X_PLANET, Y_PLANET = 0, 0                   # Начальная позиция планеты
+X_STAR, Y_STAR = X_PLANET + ORBIT_RADIUS, 0 # Начальная позиция Cолнца
+V_PLANET = 0.5e3                            # Начальная скорость планеты (м/с)
 
-x_starship, y_starship = 3 * r_planet, 2 * r_planet       # Начальная позиция космического аппарата
-v_x_starship, v_y_starship = -7e3, 3e3                    # Начальная скорость космического аппарата (м/с)
+# X_SPACECRAFT, Y_SPACECRAFT = 3 * R_PLANET, -4 * R_PLANET        # Начальная позиция космического аппарата
+# V_X_SPACECRAFT, V_Y_SPACECRAFT = -18e3, -3e3                    # Начальная скорость космического аппарата (м/с)
 
-dt = 20                                     # Шаг времени (с)
-day = 1440                                  # Минут в сутках
-num_steps = day*10                          # Количество шагов
+# Крушение:
+# X_SPACECRAFT, Y_SPACECRAFT = 3 * R_PLANET, -4 * R_PLANET
+# V_X_SPACECRAFT, V_Y_SPACECRAFT = -7e3, -3.5e3
+
+# Зонд делает оборот вокруг звезды
+X_SPACECRAFT, Y_SPACECRAFT = 30 * R_PLANET, -40 * R_PLANET
+V_X_SPACECRAFT, V_Y_SPACECRAFT = -37e3, -3e3
+
+# Зонд делает оборот вокруг планеты
+# X_SPACECRAFT, Y_SPACECRAFT = 3 * R_PLANET, -4 * R_PLANET
+# V_X_SPACECRAFT, V_Y_SPACECRAFT = -7e3, -3e3
+
+# Манёвр по параболе
+# X_SPACECRAFT, Y_SPACECRAFT = 3 * R_PLANET, -4 * R_PLANET
+# V_X_SPACECRAFT, V_Y_SPACECRAFT = -18e3, -3e3
+
+DT = 60                                     # Шаг времени (с)
+DAY = 1440                                  # Минут в сутках
+NUM_STEPS = DAY * 1000                      # Количество шагов
 T = 360 * 24 * 3600                         # Период орбиты (с)
 
-omega = 2 * pi / T                                                                # Угловая скорость (рад/сек)
-initial_distance = sqrt((x_starship - x_planet)**2 + (y_starship - y_planet)**2)  # Начальное расстояние
+OMEGA = 2 * pi / T                                                                      # Угловая скорость (рад/сек)
+INITIAL_DISTANCE = sqrt((X_SPACECRAFT - X_PLANET)**2 + (Y_SPACECRAFT - Y_PLANET)**2)    # Начальное расстояние
