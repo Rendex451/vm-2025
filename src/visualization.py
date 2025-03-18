@@ -4,7 +4,7 @@ from matplotlib.animation import FuncAnimation
 
 from config import *
 
-def draw_nahui(x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance):
+def draw_graphics(x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance):
     plot_limit = 2 * ORBIT_RADIUS
     fig1, ax1 = plt.subplots(figsize=(10, 10))
     ax1.plot(x_trajectory, y_trajectory, label='Spacecraft Trajectory')

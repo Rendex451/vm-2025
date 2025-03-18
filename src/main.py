@@ -1,7 +1,7 @@
 import numpy as np
 
 from config import *
-from visualization import animate_trajectories, draw_nahui
+from visualization import animate_trajectories, draw_graphics
 
 
 def move_planet(t):
@@ -140,16 +140,80 @@ def rk4_method(x_sc, y_sc, x_p, y_p, v_x, v_y):
 
     return x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance
 
+def total_acceleration(x_sc, y_sc, t):
+    x_p, y_p = move_planet(t)
+    a_x_p, a_y_p, _ = planet_acceleration(x_sc, y_sc, x_p, y_p)
+    a_x_s, a_y_s = star_acceleration(x_sc, y_sc)
+    if a_x_p == 0 or a_x_s == 0:  # Проверка на столкновение
+        return 0, 0
+    return a_x_p + a_x_s, a_y_p + a_y_s
+
+# Неявный метод трапеций
+def trapezoidal_method(x_sc, y_sc, v_x, v_y, t_start=0, max_iterations=10, tolerance=1e-6):
+    x_trajectory, y_trajectory = [x_sc], [y_sc]
+    speed, distance = [np.sqrt(v_x**2 + v_y**2)], [INITIAL_DISTANCE]
+    t = t_start
+
+    for _ in range(NUM_STEPS):
+        h = DT
+        # Начальное приближение для y_{n+1} (метод Эйлера)
+        x_next = x_sc + h * v_x
+        y_next = y_sc + h * v_y
+        v_x_next = v_x + h * total_acceleration(x_sc, y_sc, t)[0]
+        v_y_next = v_y + h * total_acceleration(x_sc, y_sc, t)[1]
+
+        # Итерации для решения неявного уравнения
+        for _ in range(max_iterations):
+            a_x_next, a_y_next = total_acceleration(x_next, y_next, t + h)
+            if a_x_next == 0:  # Столкновение
+                break
+
+            x_new = x_sc + (h / 2) * (v_x + v_x_next)
+            y_new = y_sc + (h / 2) * (v_y + v_y_next)
+            v_x_new = v_x + (h / 2) * (total_acceleration(x_sc, y_sc, t)[0] + a_x_next)
+            v_y_new = v_y + (h / 2) * (total_acceleration(x_sc, y_sc, t)[1] + a_y_next)
+
+            # Проверка сходимости
+            if (np.abs(x_new - x_next) < tolerance and
+                np.abs(y_new - y_next) < tolerance and
+                np.abs(v_x_new - v_x_next) < tolerance and
+                np.abs(v_y_new - v_y_next) < tolerance):
+                x_next, y_next, v_x_next, v_y_next = x_new, y_new, v_x_new, v_y_new
+                break
+            x_next, y_next, v_x_next, v_y_next = x_new, y_new, v_x_new, v_y_new
+
+        if a_x_next == 0:  # Прерывание при столкновении
+            break
+
+        # Обновление текущего состояния
+        x_sc, y_sc, v_x, v_y = x_next, y_next, v_x_next, v_y_next
+        x_trajectory.append(x_sc)
+        y_trajectory.append(y_sc)
+        speed.append(np.sqrt(v_x**2 + v_y**2))
+        x_p, y_p = move_planet(t)
+        distance.append(np.sqrt((x_sc - x_p)**2 + (y_sc - y_p)**2))
+        t += h
+
+    x_planet_trajectory = [move_planet(t)[0] for t in np.linspace(0, t, NUM_STEPS+1)]
+    y_planet_trajectory = [move_planet(t)[1] for t in np.linspace(0, t, NUM_STEPS+1)]
+
+    return x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance
+
 def main():
-    x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance \
-        = euler_method(X_SPACECRAFT, Y_SPACECRAFT, X_PLANET, Y_PLANET, V_X_SPACECRAFT, V_Y_SPACECRAFT)
+    # x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance \
+    #     = euler_method(X_SPACECRAFT, Y_SPACECRAFT, X_PLANET, Y_PLANET, V_X_SPACECRAFT, V_Y_SPACECRAFT)
     # animate_trajectories(x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory)
-    draw_nahui(x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance)
+    # draw(x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance)
 
     x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance \
         = rk4_method(X_SPACECRAFT, Y_SPACECRAFT, X_PLANET, Y_PLANET, V_X_SPACECRAFT, V_Y_SPACECRAFT)
-    # animate_trajectories(x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory)
-    draw_nahui(x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance)
+    animate_trajectories(x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory)
+    draw_graphics(x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance)
+
+    x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance \
+        = trapezoidal_method(X_SPACECRAFT, Y_SPACECRAFT, V_X_SPACECRAFT, V_Y_SPACECRAFT)
+    animate_trajectories(x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory)
+    draw_graphics(x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance)
   
 if __name__ == "__main__":
     main()
