@@ -3,6 +3,16 @@ import numpy as np
 from config import *
 from visualization import animate_trajectories, draw_graphics
 
+class Energy:
+    def __init__(self, x_sc, y_sc, v_x, v_y, x_p, y_p):
+        r_p = np.sqrt((x_sc - x_p)**2 + (y_sc - y_p)**2)
+        r_s = np.sqrt((x_sc - X_STAR)**2 + (y_sc - Y_STAR)**2)
+
+        self.kinetic_energy = 0.5 * M_SPACECRAFT * (v_x**2 + v_y**2)
+        self.potential_energy_planet = -G * M_PLANET * M_SPACECRAFT / r_p
+        self.potential_energy_star = -G * M_STAR * M_SPACECRAFT / r_s
+        self.total_energy = self.kinetic_energy + self.potential_energy_planet + self.potential_energy_star
+
 
 def move_planet(t):
     x_p = -ORBIT_RADIUS * np.cos(OMEGA * t) + ORBIT_RADIUS
@@ -54,8 +64,6 @@ def euler_method(x_sc, y_sc, x_p, y_p, v_x, v_y):
         x_sc += v_x * DT
         y_sc += v_y * DT
         x_p, y_p = move_planet(t)
-        #x_p += v_px * dt
-        #y_p += v_py * dt
         
         x_trajectory.append(x_sc)
         y_trajectory.append(y_sc)
@@ -71,7 +79,7 @@ def euler_method(x_sc, y_sc, x_p, y_p, v_x, v_y):
 def rk4_method(x_sc, y_sc, x_p, y_p, v_x, v_y):
     x_trajectory, y_trajectory = [], []
     x_planet_trajectory, y_planet_trajectory = [], []
-    speed, distance = [], []
+    speed, distance, energy = [], [], []
     t = 0
     
     for _ in range(NUM_STEPS):
@@ -135,8 +143,108 @@ def rk4_method(x_sc, y_sc, x_p, y_p, v_x, v_y):
         x_planet_trajectory.append(x_p)
         y_planet_trajectory.append(y_p)
         speed.append(np.sqrt(v_x**2 + v_y**2))
+        energy.append(Energy(x_sc, y_sc, v_x, v_y, x_p, y_p))
         distance.append(np.sqrt((x_sc - x_p)**2 + (y_sc - y_p)**2))
         t += DT
+
+    return x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance, energy
+
+def adams_bashforth_method(x_sc, y_sc, x_p, y_p, v_x, v_y):
+    x_trajectory, y_trajectory = [], []
+    x_planet_trajectory, y_planet_trajectory = [], []
+    speed, distance = [], []
+    t = 0
+
+    # Начальная инициализация с использованием метода Рунге-Кутты 4-го порядка
+    rk4_steps = 4
+    for _ in range(rk4_steps):
+        a_x_p1, a_y_p1, r_p = planet_acceleration(x_sc, y_sc, x_p, y_p)
+        a_x_s1, a_y_s1 = star_acceleration(x_sc, y_sc)
+        if a_x_p1 == 0 or a_x_s1 == 0:
+            break  # Остановка при столкновении
+        a_x1 = a_x_p1 + a_x_s1
+        a_y1 = a_y_p1 + a_y_s1
+        
+        k1_vx, k1_vy = a_x1 * DT, a_y1 * DT
+        k1_x, k1_y = v_x * DT, v_y * DT
+
+        a_x_p2, a_y_p2, _ = planet_acceleration(x_sc + 0.5 * k1_x, y_sc + 0.5 * k1_y, x_p, y_p)
+        a_x_s2, a_y_s2 = star_acceleration(x_sc + 0.5 * k1_x, y_sc + 0.5 * k1_y)
+        if a_x_p2 == 0 or a_x_s2 == 0:
+            break  # Остановка при столкновении
+        a_x2 = a_x_p2 + a_x_s2
+        a_y2 = a_y_p2 + a_y_s2
+        
+        k2_vx, k2_vy = a_x2 * DT, a_y2 * DT
+        k2_x, k2_y = (v_x + 0.5 * k1_vx) * DT, (v_y + 0.5 * k1_vy) * DT
+
+        a_x_p3, a_y_p3, _ = planet_acceleration(x_sc + 0.5 * k2_x, y_sc + 0.5 * k2_y, x_p, y_p)
+        a_x_s3, a_y_s3 = star_acceleration(x_sc + 0.5 * k2_x, y_sc + 0.5 * k2_y)
+        if a_x_p3 == 0 or a_x_s3 == 0:
+            break  # Остановка при столкновении
+        a_x3 = a_x_p3 + a_x_s3
+        a_y3 = a_y_p3 + a_y_s3
+        
+        k3_vx, k3_vy = a_x3 * DT, a_y3 * DT
+        k3_x, k3_y = (v_x + 0.5 * k2_vx) * DT, (v_y + 0.5 * k2_vy) * DT
+
+        a_x_p4, a_y_p4, _ = planet_acceleration(x_sc + k3_x, y_sc + k3_y, x_p, y_p)
+        a_x_s4, a_y_s4 = star_acceleration(x_sc + k3_x, y_sc + k3_y)
+        if a_x_p4 == 0 or a_x_s4 == 0:
+            break  # Остановка при столкновении
+        a_x4 = a_x_p4 + a_x_s4
+        a_y4 = a_y_p4 + a_y_s4
+        
+        k4_vx, k4_vy = a_x4 * DT, a_y4 * DT
+        k4_x, k4_y = (v_x + k3_vx) * DT, (v_y + k3_vy) * DT
+
+        v_x += (k1_vx + 2 * k2_vx + 2 * k3_vx + k4_vx) / 6
+        v_y += (k1_vy + 2 * k2_vy + 2 * k3_vy + k4_vy) / 6
+        
+        x_sc += (k1_x + 2 * k2_x + 2 * k3_x + k4_x) / 6
+        y_sc += (k1_y + 2 * k2_y + 2 * k3_y + k4_y) / 6
+
+        x_p, y_p = move_planet(t)
+
+        x_trajectory.append(x_sc)
+        y_trajectory.append(y_sc)
+        x_planet_trajectory.append(x_p)
+        y_planet_trajectory.append(y_p)
+        speed.append(np.sqrt(v_x**2 + v_y**2))
+        distance.append(np.sqrt((x_sc - x_p)**2 + (y_sc - y_p)**2))
+        t += DT
+
+    # Используем метод Адамса-Башфорта 4-го порядка
+    for _ in range(NUM_STEPS - rk4_steps):
+        a_x_p, a_y_p, r_p = planet_acceleration(x_sc, y_sc, x_p, y_p)
+        a_x_s, a_y_s = star_acceleration(x_sc, y_sc)
+        if a_x_p == 0 or a_x_s == 0:
+            break  # Остановка при столкновении
+        a_x = a_x_p + a_x_s
+        a_y = a_y_p + a_y_s
+
+        # Используем предыдущие значения ускорений для метода Адамса-Башфорта
+        a_x_prev = [a_x1, a_x2, a_x3, a_x4]
+        a_y_prev = [a_y1, a_y2, a_y3, a_y4]
+
+        v_x += DT * (55 * a_x_prev[-1] - 59 * a_x_prev[-2] + 37 * a_x_prev[-3] - 9 * a_x_prev[-4]) / 24
+        v_y += DT * (55 * a_y_prev[-1] - 59 * a_y_prev[-2] + 37 * a_y_prev[-3] - 9 * a_y_prev[-4]) / 24
+
+        x_sc += v_x * DT
+        y_sc += v_y * DT
+
+        x_p, y_p = move_planet(t)
+
+        x_trajectory.append(x_sc)
+        y_trajectory.append(y_sc)
+        x_planet_trajectory.append(x_p)
+        y_planet_trajectory.append(y_p)
+        speed.append(np.sqrt(v_x**2 + v_y**2))
+        distance.append(np.sqrt((x_sc - x_p)**2 + (y_sc - y_p)**2))
+        t += DT
+
+        a_x1, a_x2, a_x3, a_x4 = a_x2, a_x3, a_x4, a_x
+        a_y1, a_y2, a_y3, a_y4 = a_y2, a_y3, a_y4, a_y
 
     return x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance
 
@@ -199,21 +307,28 @@ def trapezoidal_method(x_sc, y_sc, v_x, v_y, t_start=0, max_iterations=10, toler
 
     return x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance
 
+
+
 def main():
     # x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance \
     #     = euler_method(X_SPACECRAFT, Y_SPACECRAFT, X_PLANET, Y_PLANET, V_X_SPACECRAFT, V_Y_SPACECRAFT)
     # animate_trajectories(x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory)
     # draw(x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance)
 
-    x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance \
+    x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance, energy \
         = rk4_method(X_SPACECRAFT, Y_SPACECRAFT, X_PLANET, Y_PLANET, V_X_SPACECRAFT, V_Y_SPACECRAFT)
     animate_trajectories(x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory)
-    draw_graphics(x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance)
+    draw_graphics(x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance, energy)
 
-    x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance \
-        = trapezoidal_method(X_SPACECRAFT, Y_SPACECRAFT, V_X_SPACECRAFT, V_Y_SPACECRAFT)
-    animate_trajectories(x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory)
-    draw_graphics(x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance)
+    # x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance \
+    #     = trapezoidal_method(X_SPACECRAFT, Y_SPACECRAFT, V_X_SPACECRAFT, V_Y_SPACECRAFT)
+    # animate_trajectories(x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory)
+    # draw_graphics(x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance)
+
+    # x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance \
+    #     = adams_bashforth_method(X_SPACECRAFT, Y_SPACECRAFT, X_PLANET, Y_PLANET, V_X_SPACECRAFT, V_Y_SPACECRAFT)
+    # animate_trajectories(x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory)
+    # draw_graphics(x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance)
   
 if __name__ == "__main__":
     main()

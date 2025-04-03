@@ -4,7 +4,7 @@ from matplotlib.animation import FuncAnimation
 
 from config import *
 
-def draw_graphics(x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance):
+def draw_graphics(x_trajectory, y_trajectory, x_planet_trajectory, y_planet_trajectory, speed, distance, energy):
     plot_limit = 2 * ORBIT_RADIUS
     fig1, ax1 = plt.subplots(figsize=(10, 10))
     ax1.plot(x_trajectory, y_trajectory, label='Spacecraft Trajectory')
@@ -39,7 +39,22 @@ def draw_graphics(x_trajectory, y_trajectory, x_planet_trajectory, y_planet_traj
     ax3.set_xlabel('Time (s)')
     ax3.set_ylabel('Distance (m)')
     ax3.set_title('Distance Between Spacecraft and Planet Over Time')
-    ax3.grid(True)  
+    ax3.grid(True)
+
+    fig4, ax4 = plt.subplots(figsize=(10, 5))
+    kinetic_energy = [e.kinetic_energy for e in energy]
+    potential_energy_planet = [e.potential_energy_planet for e in energy]
+    potential_energy_star = [e.potential_energy_star for e in energy]
+    total_energy = [e.total_energy for e in energy]
+    ax4.plot(time, kinetic_energy, label='Kinetic Energy')
+    ax4.plot(time, potential_energy_planet, label='Potential Energy from Planet')
+    ax4.plot(time, potential_energy_star, label='Potential Energy from Sun')
+    ax4.plot(time, total_energy, label='Total Energy')
+    ax4.set_xlabel('Time (s)')
+    ax4.set_ylabel('Energy (J)')
+    ax4.set_title('Energy of the Spacecraft Over Time')
+    ax4.grid(True)
+    ax4.legend()
 
     plt.show()
 
